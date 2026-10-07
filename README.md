@@ -439,6 +439,36 @@ score, idx = probs.max(0)
 | 라벨 이름을 잘못 입력함 | GUI에서 라벨 선택 → **[선택한 라벨과 데이터 삭제]** 후 재훈련 |
 | 라벨을 추가·삭제함 | 반드시 다시 훈련 (모델에 라벨 목록이 함께 저장됨). 현재 모델의 라벨은 GUI ③ 패널에 표시 |
 
+### 6.6 웹 버전: 제스처에 반응하는 페이지 (`web_gesture.py`)
+
+훈련한 모델을 브라우저에서 실행합니다. **`나이키` → 나이키 로고**, **`오키` → 👌** 가 화면에 크게 뜹니다.
+
+```bash
+python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 자동 열기 (종료: Ctrl+C)
+```
+
+1. 브라우저가 열리면 **카메라 권한을 허용**합니다.
+2. 손 제스처를 보여 주면 오른쪽에 라벨별 확률이 나오고, 같은 제스처가 잠깐(5프레임) 유지되면 반응이 뜹니다.
+3. 모델을 다시 훈련했다면 `web_gesture.py`를 다시 실행하기만 하면 됩니다.
+
+| 파일 | 역할 |
+|---|---|
+| `web_gesture.py` | `gesture_model.pt` → `web/gesture_weights.json` 변환 후 `http://localhost:8000/web/` 서버 실행 |
+| `web/index.html` | 화면 (웹캠, 반응, 확률 막대, 최소 확신도 슬라이더) |
+| `web/app.js` | MediaPipe JS로 손 랜드마크 → 파이썬과 **똑같은 정규화** → 신경망 계산 → 반응 표시 |
+
+- 신경망 계산(행렬 곱 + ReLU + softmax)은 라이브러리 없이 `app.js`에 직접 구현되어 있습니다. 파이썬과 결과가 소수점 7자리까지 같습니다.
+- 파이썬과 조건을 맞추기 위해 웹캠 영상을 **4:3으로 자르고 좌우 반전**한 화면에서 인식합니다.
+- 반응을 바꾸거나 추가하려면 `app.js`의 `REACTIONS`를 수정하세요. 라벨 이름은 훈련할 때와 똑같아야 합니다.
+  ```js
+  const REACTIONS = {
+    "나이키": { icon: NIKE_SWOOSH, caption: "JUST DO IT" },
+    "오키": { icon: "👌", caption: "OK!" },
+    "굳": { icon: "👍", caption: "GOOD" },   // 이렇게 추가
+  };
+  ```
+- `index.html`을 더블클릭해서 열면 동작하지 않습니다 (브라우저 보안상 웹캠·파일 읽기는 서버를 통해서만 가능).
+
 ---
 
 ## 7. 실습 과제
@@ -511,7 +541,9 @@ score, idx = probs.max(0)
 ├── custom_gesture.py          # 4강: 공통 모듈 (특징 변환, 신경망, CSV)
 ├── collect_gesture.py         # 4강 ①: 데이터 수집 → gesture_data.csv
 ├── train_gesture.py           # 4강 ②: 훈련 → gesture_model.pt
-└── infer_gesture.py           # 4강 ③: 실시간 추론
+├── infer_gesture.py           # 4강 ③: 실시간 추론
+├── web_gesture.py             # 4강 웹 버전 실행기
+└── web/                       # 4강 웹 버전 (index.html, app.js)
 ```
 
 > 모델 파일은 Google MediaPipe에서 제공하며 Apache License 2.0을 따릅니다.
