@@ -441,7 +441,15 @@ score, idx = probs.max(0)
 
 ### 6.6 웹 버전: 제스처에 반응하는 페이지 (`web_gesture.py`)
 
-훈련한 모델을 브라우저에서 실행합니다. **`나이키` → 나이키 로고**, **`오키` → 👌** 가 화면에 크게 뜹니다.
+훈련한 모델을 브라우저에서 실행합니다. 제스처에 따라 화면에 크게 반응이 뜹니다.
+
+| 라벨 | 반응 |
+|---|---|
+| `나이키` | 나이키 로고 + JUST DO IT |
+| `오키` | 👌 OK! |
+| `브이` | ✌️ V! |
+| `굳` | 👍 GOOD |
+| `배드` | 👎 BAD |
 
 ```bash
 python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 자동 열기 (종료: Ctrl+C)
@@ -464,7 +472,10 @@ python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 �
   const REACTIONS = {
     "나이키": { icon: NIKE_SWOOSH, caption: "JUST DO IT" },
     "오키": { icon: "👌", caption: "OK!" },
-    "굳": { icon: "👍", caption: "GOOD" },   // 이렇게 추가
+    "브이": { icon: "✌️", caption: "V!" },
+    "굳": { icon: "👍", caption: "GOOD" },
+    "배드": { icon: "👎", caption: "BAD" },
+    "손바닥": { icon: "✋", caption: "HI" },   // 이렇게 추가
   };
   ```
 - `index.html`을 더블클릭해서 열면 동작하지 않습니다 (브라우저 보안상 웹캠·파일 읽기는 서버를 통해서만 가능).
