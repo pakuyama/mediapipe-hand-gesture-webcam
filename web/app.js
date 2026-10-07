@@ -19,6 +19,7 @@ const REACTIONS = {
   "브이": { icon: "✌️", caption: "V!" },
   "굳": { icon: "👍", caption: "GOOD" },
   "배드": { icon: "👎", caption: "BAD" },
+  "손바닥": { icon: "✋", caption: "HI!" },
 };
 
 // 21개 랜드마크 연결 (엄지, 검지, 중지, 약지, 소지, 손바닥)

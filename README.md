@@ -450,6 +450,7 @@ score, idx = probs.max(0)
 | `브이` | ✌️ V! |
 | `굳` | 👍 GOOD |
 | `배드` | 👎 BAD |
+| `손바닥` | ✋ HI! |
 
 ```bash
 python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 자동 열기 (종료: Ctrl+C)
@@ -475,7 +476,8 @@ python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 �
     "브이": { icon: "✌️", caption: "V!" },
     "굳": { icon: "👍", caption: "GOOD" },
     "배드": { icon: "👎", caption: "BAD" },
-    "손바닥": { icon: "✋", caption: "HI" },   // 이렇게 추가
+    "손바닥": { icon: "✋", caption: "HI!" },
+    "주먹": { icon: "✊", caption: "ROCK" },   // 새 제스처를 훈련했다면 이렇게 추가
   };
   ```
 - `index.html`을 더블클릭해서 열면 동작하지 않습니다 (브라우저 보안상 웹캠·파일 읽기는 서버를 통해서만 가능).
