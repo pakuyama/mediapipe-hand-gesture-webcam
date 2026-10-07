@@ -3,6 +3,8 @@
 > 웹캠 영상에서 **손의 21개 관절 좌표**를 찾고, 그 손이 **어떤 제스처**를 취하고 있는지 인식하고, **얼굴의 478개 점과 표정**까지 실시간으로 분석하는 세 개의 실습 예제입니다.
 > Google **MediaPipe Tasks** 파이썬 API와 **OpenCV**를 사용합니다.
 
+> 🌐 **웹 데모 (설치 없이 바로 체험)**: https://pakuyama.github.io/mediapipe-hand-gesture-webcam/
+
 | 실습 | 파일 | 모델 | 결과 |
 |---|---|---|---|
 | 1강 | `hand_webcam.py` | `hand_landmarker.task` | 손 관절 21개 + 왼손/오른손 구분 |
@@ -482,6 +484,18 @@ python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 �
   ```
 - `index.html`을 더블클릭해서 열면 동작하지 않습니다 (브라우저 보안상 웹캠·파일 읽기는 서버를 통해서만 가능).
 
+**GitHub Pages 배포** — https://pakuyama.github.io/mediapipe-hand-gesture-webcam/
+
+웹 페이지는 GitHub Pages(`gh-pages` 브랜치)로 배포되어 있어 누구나 링크만으로 체험할 수 있습니다.
+모델을 다시 훈련했다면 아래 순서로 배포 페이지를 갱신합니다.
+
+```bash
+python -c "import web_gesture; web_gesture.export_weights()"   # web/gesture_weights.json 갱신
+git add web/gesture_weights.json
+git commit -m "Update gesture model"
+git push origin HEAD:gh-pages        # 1~2분 뒤 사이트에 반영
+```
+
 ---
 
 ## 7. 실습 과제
@@ -556,6 +570,7 @@ python web_gesture.py     # 모델 내보내기 + 로컬 서버 + 브라우저 �
 ├── train_gesture.py           # 4강 ②: 훈련 → gesture_model.pt
 ├── infer_gesture.py           # 4강 ③: 실시간 추론
 ├── web_gesture.py             # 4강 웹 버전 실행기
+├── index.html                 # GitHub Pages 첫 화면 (web/으로 이동)
 └── web/                       # 4강 웹 버전 (index.html, app.js)
 ```
 

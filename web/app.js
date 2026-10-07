@@ -125,7 +125,7 @@ async function main() {
   try {
     weights = await (await fetch(WEIGHTS_PATH)).json();
   } catch {
-    statusEl.textContent = "gesture_weights.json이 없습니다. python web_gesture.py 로 실행하세요.";
+    statusEl.textContent = "gesture_weights.json을 불러오지 못했습니다. 로컬에서는 python web_gesture.py 로 실행하세요.";
     return;
   }
   buildBars(weights.labels);
