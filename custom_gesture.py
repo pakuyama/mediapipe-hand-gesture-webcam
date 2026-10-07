@@ -3,7 +3,10 @@
 - 손 랜드마커 생성
 - 랜드마크 21개 → 63차원 특징 벡터 변환 (위치·크기·왼오른손 영향 제거)
 - 분류 신경망(MLP) 정의
+- 데이터 CSV 읽기/쓰기
 """
+import csv
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +31,47 @@ HAND_CONNECTIONS = [
     (13, 17), (17, 18), (18, 19), (19, 20),
     (0, 17),
 ]
+
+
+CSV_HEADER = ["label"] + [f"f{i}" for i in range(NUM_FEATURES)]
+
+
+def load_counts():
+    """gesture_data.csv의 라벨별 샘플 개수"""
+    counts = Counter()
+    if DATA_PATH.exists():
+        with open(DATA_PATH, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            next(reader, None)  # 헤더
+            for row in reader:
+                if row:
+                    counts[row[0]] += 1
+    return counts
+
+
+def append_rows(rows):
+    """[라벨, 특징 63개] 행들을 gesture_data.csv 끝에 추가 (파일이 없으면 헤더부터)"""
+    if not rows:
+        return
+    new_file = not DATA_PATH.exists()
+    with open(DATA_PATH, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if new_file:
+            writer.writerow(CSV_HEADER)
+        for label, feats in rows:
+            writer.writerow([label] + [f"{v:.6f}" for v in feats])
+
+
+def delete_label(label):
+    """gesture_data.csv에서 해당 라벨의 행을 모두 삭제하고 지운 개수를 반환"""
+    if not DATA_PATH.exists():
+        return 0
+    with open(DATA_PATH, newline="", encoding="utf-8") as f:
+        rows = [row for row in csv.reader(f) if row]
+    kept = [rows[0]] + [row for row in rows[1:] if row[0] != label]
+    with open(DATA_PATH, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows(kept)
+    return len(rows) - len(kept)
 
 
 def create_hand_landmarker(num_hands=1):

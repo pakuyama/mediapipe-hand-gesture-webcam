@@ -5,36 +5,22 @@
 조작:
   숫자키 1~9  : 수집할 라벨 선택
   SPACE      : 녹화 시작/정지 (녹화 중에는 손이 보이는 프레임마다 1개씩 저장)
-  q / ESC    : 종료 (저장은 실시간으로 되므로 언제 꺼도 안전)
+  q / ESC    : 종료 (종료할 때 남은 샘플도 저장됨)
 
 라벨 이름은 영어로 쓰세요 (OpenCV 화면 글씨가 한글을 표시하지 못함).
 같은 파일(gesture_data.csv)에 계속 이어서 저장되므로 여러 번 나눠 수집해도 됩니다.
 """
-import csv
 import sys
 import time
-from collections import Counter
 
 import cv2
 import mediapipe as mp
 
-from custom_gesture import DATA_PATH, NUM_FEATURES, create_hand_landmarker, draw_hand, landmarks_to_features
+from custom_gesture import DATA_PATH, append_rows, create_hand_landmarker, draw_hand, landmarks_to_features, load_counts
 
 CAMERA_INDEX = 0
 TARGET_PER_LABEL = 300  # 라벨당 이만큼 모이면 자동으로 녹화 정지
 SAVE_EVERY = 2          # N프레임마다 1개 저장 (연속 프레임은 거의 같아서 간격을 둠)
-
-
-def load_counts():
-    counts = Counter()
-    if DATA_PATH.exists():
-        with open(DATA_PATH, newline="", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            next(reader, None)  # 헤더
-            for row in reader:
-                if row:
-                    counts[row[0]] += 1
-    return counts
 
 
 def main():
@@ -44,11 +30,7 @@ def main():
         sys.exit("라벨을 1~9개 입력하세요.  예) python collect_gesture.py none rock scissors paper")
 
     counts = load_counts()
-    new_file = not DATA_PATH.exists()
-    f = open(DATA_PATH, "a", newline="", encoding="utf-8")
-    writer = csv.writer(f)
-    if new_file:
-        writer.writerow(["label"] + [f"f{i}" for i in range(NUM_FEATURES)])
+    pending = []  # 아직 파일에 안 쓴 샘플 (녹화 정지·라벨 변경·종료 시 저장)
 
     cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_DSHOW)
     if not cap.isOpened():
@@ -81,11 +63,12 @@ def main():
                 frame_idx += 1
                 if recording and frame_idx % SAVE_EVERY == 0:
                     feats = landmarks_to_features(landmarks, hand)
-                    writer.writerow([label] + [f"{v:.6f}" for v in feats])
+                    pending.append((label, feats))
                     counts[label] += 1
                     if counts[label] >= TARGET_PER_LABEL:
                         recording = False
-                        f.flush()
+                        append_rows(pending)
+                        pending.clear()
 
             # 상태 표시
             status = "REC" if recording else "PAUSE"
@@ -107,13 +90,15 @@ def main():
                 break
             if key == ord(" "):
                 recording = not recording
-                f.flush()
+                append_rows(pending)
+                pending.clear()
             if ord("1") <= key <= ord("9") and key - ord("1") < len(labels):
                 current = key - ord("1")
                 recording = False
-                f.flush()
+                append_rows(pending)
+                pending.clear()
 
-    f.close()
+    append_rows(pending)
     cap.release()
     cv2.destroyAllWindows()
     print(f"저장 위치: {DATA_PATH}")
