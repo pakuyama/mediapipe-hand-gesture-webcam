@@ -8,6 +8,7 @@
 | 1강 | `hand_webcam.py` | `hand_landmarker.task` | 손 관절 21개 + 왼손/오른손 구분 |
 | 2강 | `gesture_webcam.py` | `gesture_recognizer.task` | 위 결과 + 제스처 이름(👍, ✌️ …) |
 | 3강 | `face_webcam.py` | `face_landmarker.task` | 얼굴 478점 메시 + 홍채 + 표정 점수(블렌드셰이프) |
+| 4강 | `collect_gesture.py` → `train_gesture.py` → `infer_gesture.py` | `hand_landmarker.task` + 직접 학습한 `gesture_model.pt` | **내가 정한 제스처** 인식 |
 
 ---
 
@@ -98,6 +99,7 @@ MediaPipe는 Google이 만든 온디바이스(on-device) 머신러닝 프레임�
 
 ```bash
 pip install mediapipe opencv-python
+pip install torch   # 4강(나만의 제스처 학습)에서만 필요
 ```
 
 > 실습 확인 환경: Python 3.14, mediapipe 1.1.0, opencv-python 5.0.0 (Windows 11)
@@ -323,7 +325,116 @@ for k, b in enumerate(top[:5]):
 
 ---
 
-## 6. 실습 과제
+## 6. 4강: 나만의 제스처 학습하기 (`collect_gesture.py` → `train_gesture.py` → `infer_gesture.py`)
+
+2강의 기본 제스처 8종 대신 **내가 정한 제스처**(예: 가위·바위·보, 숫자 1~5, 🤙 …)를 인식하도록 직접 학습합니다.
+
+### 6.1 아이디어: 랜드마크 위에 작은 분류기 얹기
+
+```
+웹캠 프레임 ─▶ Hand Landmarker(1강) ─▶ 21점 좌표 ─▶ 정규화(63차원) ─▶ 작은 신경망(MLP) ─▶ 제스처 이름
+                (이미 학습된 모델)                   custom_gesture.py      내가 학습시키는 부분
+```
+
+이미지 전체를 학습하는 대신 **손 관절 좌표만** 학습하므로, 제스처당 수백 장(웹캠 수십 초)이면 충분하고 CPU로 몇 초 만에 훈련됩니다.
+2강의 Gesture Recognizer도 내부적으로 같은 구조(랜드마크 → 분류기)입니다.
+
+`custom_gesture.py`의 `landmarks_to_features()`가 좌표를 다음처럼 정규화합니다.
+
+| 처리 | 효과 |
+|---|---|
+| 손목(0번)을 원점으로 이동 | 손이 화면 어디에 있든 같은 값 |
+| 왼손이면 x 좌우 반전 | 오른손으로만 수집해도 왼손까지 인식 |
+| 가장 먼 점까지 거리를 1로 | 카메라와 가깝든 멀든 같은 값 |
+
+### 6.2 파일 구성
+
+| 파일 | 역할 | 입력 → 출력 |
+|---|---|---|
+| `custom_gesture.py` | 공통 모듈 (랜드마커 생성, 특징 변환, 신경망 정의) | — |
+| `collect_gesture.py` | ① 데이터 수집 | 웹캠 → `gesture_data.csv` |
+| `train_gesture.py` | ② 훈련 | `gesture_data.csv` → `gesture_model.pt` |
+| `infer_gesture.py` | ③ 실시간 추론 | 웹캠 + `gesture_model.pt` → 화면 표시 |
+
+### 6.3 사용 방법
+
+**① 수집** — 라벨 이름을 영어로 나열합니다 (화면 글씨가 한글을 표시하지 못함).
+
+```bash
+python collect_gesture.py none rock scissors paper
+```
+
+| 키 | 동작 |
+|---|---|
+| `1`~`9` | 수집할 라벨 선택 (화면 왼쪽 목록의 `>` 표시) |
+| `SPACE` | 녹화 시작/정지 — 녹화 중에는 손이 빨간색, 라벨당 300개가 모이면 자동 정지 |
+| `q` / `ESC` | 종료 (실시간 저장되므로 언제 꺼도 안전) |
+
+수집 요령:
+- 녹화 중에 손을 **조금씩 움직이고, 돌리고, 앞뒤로** 옮겨 주세요. 다양할수록 실전에서 잘 됩니다.
+- **`none` 라벨을 꼭 만드세요.** 아무 제스처도 아닌 평소 손 모양(반쯤 편 손, 손 내리는 중 등)을 모아 두면, 엉뚱한 손 모양을 억지로 제스처로 분류하는 일이 줄어듭니다.
+- 데이터는 `gesture_data.csv`에 **이어서** 저장됩니다. 나중에 제스처를 추가하려면 새 라벨만 넣어 다시 실행하면 됩니다. 처음부터 다시 하려면 CSV 파일을 지우세요.
+
+**② 훈련**
+
+```bash
+python train_gesture.py              # 기본 150 epoch
+python train_gesture.py --epochs 300 # 더 오래
+```
+
+출력 예시:
+
+```
+epoch  150  loss 0.0213  val_acc 0.987
+최고 검증 정확도 0.987 → 저장: ...\gesture_model.pt
+
+혼동 행렬 (행=정답, 열=예측)
+               none    paper     rock  scissor
+      none       58        1        0        1
+     paper        0       60        0        0
+      ...
+```
+
+- 데이터의 20%를 떼어 **검증**에 쓰고, 검증 정확도가 가장 높았던 순간의 모델을 저장합니다.
+- 훈련 중에는 데이터에 약간의 회전(±10°)·크기 변화·잡음을 섞어(데이터 증강) 적은 데이터로도 잘 일반화되게 합니다.
+- **혼동 행렬**에서 대각선 밖 숫자가 큰 칸은 모델이 헷갈리는 제스처 쌍입니다 → 그 제스처를 더 수집하거나 더 구분되는 모양으로 바꾸세요.
+
+**③ 추론**
+
+```bash
+python infer_gesture.py
+```
+
+손 위에 `Right rock 0.98`처럼 표시됩니다. 확신도가 `MIN_SCORE`(0.7)보다 낮으면 `?`로 나옵니다.
+
+### 6.4 코드 핵심 부분
+
+```python
+# 수집 (collect_gesture.py) — 손이 보이는 프레임을 63차원 벡터로 바꿔 CSV 한 줄로 저장
+feats = landmarks_to_features(landmarks, hand)
+writer.writerow([label] + [f"{v:.6f}" for v in feats])
+
+# 추론 (infer_gesture.py) — 같은 변환을 거친 뒤 신경망에 넣고 softmax로 확률화
+feats = landmarks_to_features(landmarks, hand)
+probs = torch.softmax(model(torch.from_numpy(feats)[None]), dim=1)[0]
+score, idx = probs.max(0)
+```
+
+> **수집과 추론의 전처리는 반드시 같아야 합니다.** 둘 다 `cv2.flip(frame, 1)`(거울 모드) + `landmarks_to_features()`를 쓰는 이유입니다.
+
+### 6.5 결과가 안 좋을 때
+
+| 증상 | 해결 |
+|---|---|
+| 검증 정확도는 높은데 실제로는 잘 틀림 | 수집할 때 손을 너무 고정했음 → 각도·거리를 바꿔 가며 추가 수집. 다른 사람 손도 섞으면 더 좋음 |
+| 아무 손 모양이나 특정 제스처로 인식 | `none` 라벨 데이터를 늘리거나 `MIN_SCORE`를 0.8~0.9로 올리기 |
+| 두 제스처를 계속 헷갈림 | 혼동 행렬 확인 → 두 제스처를 더 수집하거나, 손 모양이 더 다른 제스처로 교체 |
+| 라벨 이름을 잘못 입력함 | `gesture_data.csv`를 엑셀/메모장으로 열어 해당 줄 삭제 후 재훈련 |
+| 라벨을 추가·삭제함 | 반드시 `train_gesture.py`를 다시 실행 (모델에 라벨 목록이 함께 저장됨) |
+
+---
+
+## 7. 실습 과제
 
 난이도 순으로 도전해 보세요.
 
@@ -345,9 +456,15 @@ for k, b in enumerate(top[:5]):
 13. **[심화]** 눈을 2초 이상 감고 있으면 경고를 띄우는 **졸음 감지기**를 만들어 보세요.
 14. **[심화]** 손(2강)과 얼굴(3강)을 한 프로그램에서 동시에 실행해 보세요. (힌트: 태스크 객체 두 개, 같은 프레임을 둘 다에 전달)
 
+**4강 과제**
+
+15. **[기초]** 가위·바위·보 3종 + `none`을 학습시켜 보세요.
+16. **[응용]** 추론 결과로 컴퓨터와 가위바위보 게임을 만들어 보세요. (힌트: 같은 결과가 10프레임 연속일 때 확정)
+17. **[심화]** `none` 없이 학습한 모델과 있는 모델의 오인식을 비교해 보세요.
+
 ---
 
-## 7. 자주 묻는 질문 / 문제 해결
+## 8. 자주 묻는 질문 / 문제 해결
 
 | 증상 | 원인 및 해결 |
 |---|---|
@@ -363,7 +480,7 @@ for k, b in enumerate(top[:5]):
 
 ---
 
-## 8. 더 알아보기
+## 9. 더 알아보기
 
 - [Gesture Recognizer 공식 가이드](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer)
 - [Hand Landmarker 공식 가이드](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)
@@ -382,7 +499,11 @@ for k, b in enumerate(top[:5]):
 ├── gesture_webcam.py          # 2강: 제스처 인식
 ├── gesture_recognizer.task    # 2강 모델
 ├── face_webcam.py             # 3강: 얼굴 랜드마크 & 표정 인식
-└── face_landmarker.task       # 3강 모델
+├── face_landmarker.task       # 3강 모델
+├── custom_gesture.py          # 4강: 공통 모듈 (특징 변환, 신경망)
+├── collect_gesture.py         # 4강 ①: 데이터 수집 → gesture_data.csv
+├── train_gesture.py           # 4강 ②: 훈련 → gesture_model.pt
+└── infer_gesture.py           # 4강 ③: 실시간 추론
 ```
 
 > 모델 파일은 Google MediaPipe에서 제공하며 Apache License 2.0을 따릅니다.
